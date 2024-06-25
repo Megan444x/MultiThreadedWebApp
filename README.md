@@ -1,1 +1,1 @@
-# MultiThreadedWebApp
+MultiThreadedWebApp is a Rust-based project leveraging Actix-web to deliver a high-performance, multithreaded web application. This repository encompasses the setup for middleware integration, database connectivity, and the registration of essential routes. Designed for efficiency and scalability, it ensures that the application runs in a multithreaded mode, taking full advantage of system resources to provide responsive and robust service handling.
