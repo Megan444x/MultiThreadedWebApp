@@ -1,0 +1,18 @@
+{
+  "name": "multithreaded_web_app",
+  "version": "1.0.0",
+  "description": "A multithreaded web application using Rust for the backend and minimal JavaScript for the frontend",
+  "main": "main.js",
+  "scripts": {
+    "start": "webpack serve --mode development --open",
+    "build": "webpack --mode production"
+  },
+  "dependencies": {
+    "webpack": "^5.38.1",
+    "webpack-cli": "^4.7.2",
+    "webpack-dev-server": "^3.11.2",
+    "babel-loader": "^8.2.2",
+    "@babel/core": "^7.14.6",
+    "@babel/preset-env": "^7.14.7"
+  }
+}
