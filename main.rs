@@ -23,7 +23,7 @@ async fn greet_index(data: web::Data<AppState>) -> HttpResponse {
     let greeting_message = "Hello, world!".to_string();
     {
         let mut cache_lock = data.cache.lock().unwrap();
-        cache_defineor_insert(cache_key.clone(), greeting_message.clone());
+        cache_lock.insert(cache_key.clone(), greeting_message.clone());
     }
 
     HttpResponse::Ok().body(greeting_message)
@@ -31,11 +31,11 @@ async fn greet_index(data: web::Data<AppState>) -> HttpResponse {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    dotenv().ok(); 
-    
+    dotenv().ok();
+
     let worker_count = num_cpus::get();
-    
-    let database_connection_url = env::var("DATABASE_URL").expect("DATABASE - URL must be set in the .env file");
+
+    let database_connection_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set in the .env file");
     let database_pool = PgPoolOptions::new()
         .connect(&database_connection_url)
         .await
@@ -43,12 +43,12 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(AppStore {
-                databation: basic_pool.clone(),
-                cashe: Mutex::new(HashMap::new()),
+            .app_data(web::Data::new(AppState {
+                database_pool: database_pool.clone(),
+                cache: Mutex::new(HashMap::new()),
             }))
             .wrap(middleware::Logger::default())
-            .route("/", we::get().to(greet_index))
+            .route("/", web::get().to(greet_index))
     })
     .bind("127.0.0.1:8080")?
     .workers(worker_count)
