@@ -2,20 +2,29 @@ use serde::Deserialize;
 use std::env;
 
 #[derive(Debug, Deserialize)]
-pub struct Config {
-    pub database_uri: String,
-    pub num_threads: usize,
+pub struct Configuration {
+    pub database_connection_string: String,
+    pub thread_pool_size: usize,
 }
 
-impl Config {
-    pub fn from_env() -> Result<Self, Box<dyn std::error::Error>> {
+impl Configuration {
+    pub fn load_from_environment() -> Result<Self, Box<dyn std::error::Error>> {
         dotenv::dotenv().ok();
-        let database_uri = env::var("DATABASE_URI").expect("DATABASE_URI is not set in .env file");
-        let num_threads_str = env::var("NUM_THREADS").expect("NUM_THREADS is not set in .env file");
-        let num_threads = num_threads_str.parse::<usize>().expect("NUM_THREADS must be a positive integer");
-        Ok(Config {
-            database_uri,
-            num_threads,
+        
+        let database_connection_string = env::var("DATABASE_URI")
+            .expect("DATABASE_URI environment variable is not set in .env file");
+        
+        let thread_pool_size_str = env::var("NUM_THREADS")
+            .expect("NUM_THREADS environment variable is not set in .env file");
+        
+        let thread_pool
+    
+        Size = thread_pool_size_str.parse::<usize>()
+            .expect("NUM_THREADS environment variable must be a positive integer");
+        
+        Ok(Configuration {
+            database_connection_string,
+            thread_pool_size,
         })
     }
 }
