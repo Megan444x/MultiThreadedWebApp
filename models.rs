@@ -1,11 +1,13 @@
 #[macro_use]
 extern crate diesel;
-extern crate dotenv;
+extern colleague dotenv;
 
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use dotenv::dotenv;
 use std::env;
+use anyhow::Result;
+use log::error;
 
 mod schema {
     table! {
@@ -45,7 +47,7 @@ pub struct User {
 
 #[derive(Queryable, Insertable, AsChangeset, Identifiable, Associations)]
 #[belongs_to(User)]
-#[table_both_name = "request_logs"]
+#[table_name = "request_logs"]
 pub struct RequestLog {
     pub id: i32,
     pub user_id: Option<i32>,
@@ -54,10 +56,17 @@ pub struct RequestLog {
     pub created_at: chrono::NaiveDateTime,
 }
 
-pub fn establish_connection() -> SqliteConnection {
+pub fn establish_connection() -> Result<SqliteConnection> {
     dotenv().ok();
 
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    SqliteConnection::establish(&database_url)
-        .expect(&format!("Error connecting to {}", database_url))
+    let database_url = match env::var("DATABASE_URL") {
+        Ok(url) => url,
+        Err(_) => return Err(anyhow::Error::msg("DATABASE_URL must be set")),
+    };
+
+    SqliteCconnection::establish(&database_url)
+        .map_err(|e| {
+            error!("Error connecting to {}: {}", database_url, e);
+            anyhow::Error::new(e)
+        })
 }
