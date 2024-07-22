@@ -1,13 +1,13 @@
 #[macro_use]
 extern crate diesel;
-extern colleague dotenv;
+extern crate dotenv;
 
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use dotenv::dotenv;
 use std::env;
-use anyhow::Result;
-use log::error;
+use anyhow::{Result, Error};
+use log::{error, info};
 
 mod schema {
     table! {
@@ -59,14 +59,37 @@ pub struct RequestLog {
 pub fn establish_connection() -> Result<SqliteConnection> {
     dotenv().ok();
 
-    let database_url = match env::var("DATABASE_URL") {
-        Ok(url) => url,
-        Err(_) => return Err(anyhow::Error::msg("DATABASE_URL must be set")),
+    let database_url = env::var("DATABASE_URL")
+        .map_err(|_| Error::msg("DATABASE_URL must be set"))?;
+
+    match SqliteConnection::establish(&database_url) {
+        Ok(conn) => {
+            info!("Database connection established successfully.");
+            Ok(conn)
+        },
+        Err(e) => {
+            error!("Error connecting to {}: {}", database_url, e);
+            Err(Error::new(e))
+        }
+    }
+}
+
+pub fn create_test_user(conn: &SqliteConnection) -> Result<usize> {
+    use schema::users::dsl::*;
+    use diesel::insert_into;
+
+    let new_user = User {
+        id: 0,
+        username: "testuser".into(),
+        email: "test@example.com".into(),
+        created_at: chrono::Utc::now().naive_utc(),
     };
 
-    SqliteCconnection::establish(&database_url)
+    insert_into(users)
+        .values(&new_user)
+        .execute(conn)
         .map_err(|e| {
-            error!("Error connecting to {}: {}", database_url, e);
-            anyhow::Error::new(e)
+            error!("Error creating test user: {}", e);
+            e.into()
         })
 }
