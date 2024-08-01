@@ -1,62 +1,75 @@
+use actix::{Actor, SyncContext, Message, ActorContext, SyncArbiter};
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
-use std::sync::Mutex;
+use std::sync::RwLock;
 
 mod handlers;
 mod models;
 
 struct AppState {
-    user_store: Mutex<models::Users>,
-    request_log_store: Mutex<models::RequestLogs>,
+    user_store: RwLock<models::Users>,
+    request_log_store: RwLock<models::RequestLogs>,
 }
 
-async fn create_user_endpoint(user_data: web::Data<AppState>, user_payload: web::Json<models::User>) -> impl Responder {
-    let mut user_store = user_data.user_store.lock().unwrap();
-    user_store.add(user_payload.into_inner());
-    HttpResponse::Created().finish()
+#[derive(Message)]
+#[rtype(result = "Result<(), ()>")]
+struct CreateUser(models::User);
+
+#[derive(Message)]
+#[rtype(result = "Result<(), ()>")]
+struct UpdateUser(models::User);
+
+#[derive(Message)]
+#[rtype(result = "Result<(), ()>")]
+struct DeleteUser(u32);
+
+#[derive(Message)]
+#[rtype(result = "Result<models::User, ()>")]
+struct GetUser(u32);
+
+#[derive(Message)]
+#[rtype(result = "Result<(), ()>")]
+struct LogRequest(models::RequestLog);
+
+struct DbActor {
+    user_store: RwLock<models::Users>,
+    request_log_store: RwLock<models::RequestLogs>,
 }
 
-async fn update_user_endpoint(user_data: web::Data<AppState>, user_payload: web::Json<models::User>) -> impl Responder {
-    let mut user_store = user_data.user_store.lock().unwrap();
-    user_store.update(user_payload.into_inner());
-    HttpResponse::Ok().finish()
+impl Actor for DbActor {
+    type Context = SyncContext<Self>;
 }
 
-async fn delete_user_endpoint(user_data: web::Data<AppState>, user_id_path: web::Path<u32>) -> impl Responder {
-    let mut user_store = user_data.user_store.lock().unwrap();
-    user_store.delete(user_id_path.into_inner());
-    HttpResponse::Ok().finish()
-}
+impl MessageHandler<CreateUser> for DbActor {
+    type Result = Result<(), ()>;
 
-async fn retrieve_user_endpoint(user_data: web::Data<AppState>, user_id_path: web::Path<u32>) -> impl Responder {
-    let user_store = user_data.user_store.lock().unwrap();
-    if let Some(user) = user_store.get(user_id_path.into_inner()) { 
-        HttpResponse::Ok().json(user)
-    } else {
-        HttpResponse::NotFound().finish()
+    fn handle(&mut self, msg: CreateUser, _ctx: &mut Self::Context) -> Self::Result {
+        let mut user_store = self.user_store.write().unwrap();
+        user_store.add(msg.0);
+        Ok(())
     }
 }
 
-async fn create_request_log_endpoint(log_data: web::Data<AppState>, log_payload: web::Json<models::RequestLog>) -> impl Responder {
-    let mut request_log_store = log_data.request_log_store.lock().unwrap();
-    request_log_store.log(log_payload.into_inner());
+async fn create_user_endpoint(db: web::Data<DbActor>, user_payload: web::Json<models::User>) -> impl Responder {
+    db.send(CreateUser(user_payload.into_inner())).await.unwrap();
     HttpResponse::Created().finish()
 }
 
-#[actix_rt::main]
+#[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let data = web::Data::new(AppState {
-        user_store: Mutex::new(models::Users::new()),
-        request_log_store: Mutex::new(models::RequestLogs::new()),
+    let data = AppState {
+        user_store: RwLock::new(models::Users::new()),
+        request_log_store: RwLock::new(models::RequestLogs::new()),
+    };
+
+    let db_actor = SyncArbiter::start(4, move || DbActor { 
+        user_store: data.user_store.clone(), 
+        request_log_store: data.request_log_store.clone(),
     });
 
     HttpServer::new(move || {
         App::new()
-            .app_data(data.clone())
+            .app_data(web::Data::new(db_actor.clone()))
             .route("/users/add", web::post().to(create_user_endpoint))
-            .route("/users/{id}/update", web::put().to(update_user_endpoint))
-            .route("/users/{id}/delete", web::delete().to(delete_user_endpoint))
-            .route("/users/{id}", web::get().to(retrieve_user_endpoint))
-            .route("/log/request", web::post().to(create_request_log_endpoint))
     })
     .bind("127.0.0.1:8080")?
     .run()
