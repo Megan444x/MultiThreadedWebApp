@@ -1,5 +1,5 @@
-use actix::{Actor, SyncContext, Message, ActorContext, SyncArbiter};
-use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use actix::{Actor, SyncContext, Message, ActorContext, SyncArbiter, Handler as MessageHandler};
+use actix_web::{web, App, HttpResponse, HttpServer, Responder, error, Error};
 use std::sync::RwLock;
 
 mod handlers;
@@ -11,23 +11,23 @@ struct AppState {
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "Result<(), String>")] // Using String to communicate error details
 struct CreateUser(models::User);
 
 #[derive(Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "Result<(), String>")]
 struct UpdateUser(models::User);
 
 #[derive(Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "Result<(), String>")]
 struct DeleteUser(u32);
 
 #[derive(Message)]
-#[rtype(result = "Result<models::User, ()>")]
+#[rtype(result = "Result<models::User, String>")]
 struct GetUser(u32);
 
 #[derive(Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "Result<(), String>")]
 struct LogRequest(models::RequestLog);
 
 struct DbActor {
@@ -40,18 +40,19 @@ impl Actor for DbActor {
 }
 
 impl MessageHandler<CreateUser> for DbActor {
-    type Result = Result<(), ()>;
+    type Result = Result<(), String>;
 
     fn handle(&mut self, msg: CreateUser, _ctx: &mut Self::Context) -> Self::Result {
-        let mut user_store = self.user_store.write().unwrap();
+        let mut user_store = self.user_store.write().map_err(|e| format!("Failed to acquire write lock: {}", e))?;
         user_store.add(msg.0);
         Ok(())
     }
 }
 
-async fn create_user_endpoint(db: web::Data<DbActor>, user_payload: web::Json<models::User>) -> impl Responder {
-    db.send(CreateUser(user_payload.into_inner())).await.unwrap();
-    HttpResponse::Created().finish()
+async fn create_user_endpoint(db: web::Data<DbActor>, user_payload: web::Json<models::User>) -> Result<HttpResponse, Error> {
+    db.send(CreateUser(user_payload.into_inner())).await.map_err(|e| error::ErrorInternalServerError(e))?
+        .map_err(|e| error::ErrorBadRequest(e))?;
+    Ok(HttpResponse::Created().finish())
 }
 
 #[actix_web::main]
