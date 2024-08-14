@@ -3,7 +3,11 @@ import React, { Component } from 'react';
 class ErrorBoundary extends Component {
     constructor(props) {
         super(props);
-        this.state = { hasError: false, error: null, errorInfo: null };
+        this.state = {
+            hasError: false,
+            error: null,
+            errorInfo: null
+        };
     }
 
     static getDerivedStateFromError(error) {
@@ -20,32 +24,35 @@ class ErrorBoundary extends Component {
 
     render() {
         if (this.state.hasError) {
-            return <div>
-                <h2>Something went wrong.</h2>
-                <details style={{ whiteSpace: 'pre-wrap' }}>
-                    {this.state.error && this.state.error.toString()}
-                    <br />
-                    {this.state.errorInfo.componentStack}
-                </details>
-            </div>;
+            return (
+                <div>
+                    <h2>Something went wrong.</h2>
+                    <details style={{ whiteSpace: 'pre-wrap' }}>
+                        {this.state.error && this.state.error.toString()}
+                        <br />
+                        {this.state.errorInfo.componentStack}
+                    </details>
+                </div>
+            );
         }
 
-        return this.props.children; 
+        return this.props.children;
     }
 }
 
 export default ErrorBoundary;
 ```
+
 ```javascript
 import React, { lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import ErrorBoundary from './components/ErrorBoundary'; 
+import ErrorBoundary from './components/ErrorBoundary';
+import './index.css';
+
 const App = lazy(() => import('./App'));
 const HomePage = lazy(() => import('./components/HomePage'));
 const NotFoundPage = lazy(() => import('./components/NotFoundPage'));
-
-import './index.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
